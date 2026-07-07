@@ -1,27 +1,26 @@
 name: Unzip project
 on: workflow_dispatch
+permissions:
+  contents: write
+  workflows: write
 jobs:
   unzip:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
       - run: |
-          unzip -o lotto535_final_with_firebase.zip -d .
-          rm lotto535_final_with_firebase.zip
-          # di chuyển file từ thư mục con ra ngoài
+          unzip -o lotto535_final_with_firebase.zip -d . || true
+          rm -f lotto535_final_with_firebase.zip
           if [ -d "lotto535_app_final" ]; then
-            cp -r lotto535_app_final/* . || true
-            cp -r lotto535_app_final/.github . || true
+            cp -r lotto535_app_final/* . 2>/dev/null || true
+            cp -r lotto535_app_final/.github . 2>/dev/null || true
             rm -rf lotto535_app_final
           fi
-          if [ -d "lotto535_final_with_firebase" ]; then
-            cp -r lotto535_final_with_firebase/* . || true
-            rm -rf lotto535_final_with_firebase
-          fi
-          ls -la
       - run: |
           git config user.name "bot"
           git config user.email "bot@bot.com"
           git add .
           git commit -m "auto unzip" || echo "no change"
-          git push
+          git push origin main
