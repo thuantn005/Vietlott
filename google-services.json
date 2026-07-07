@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "143995227838",
+    "project_id": "lotto535-259d7",
+    "storage_bucket": "lotto535-259d7.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:143995227838:android:429abb602be39ea97718ef",
+        "android_client_info": {
+          "package_name": "com.lotto535.notifier"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyByEAAJ9vKdAVd5dVtUr8jOeBxk0uMxtHw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

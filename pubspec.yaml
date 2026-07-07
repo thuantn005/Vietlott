@@ -1,0 +1,14 @@
+name: lotto535_notifier
+description: App nhan ket qua Vietlott Lotto 5/35
+publish_to: 'none'
+version: 1.0.0+1
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+dependencies:
+  flutter:
+    sdk: flutter
+  firebase_core: ^2.24.0
+  firebase_messaging: ^14.9.0
+  url_launcher: ^6.2.5
+flutter:
+  uses-material-design: true
