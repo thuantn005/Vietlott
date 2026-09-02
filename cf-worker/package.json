@@ -1,0 +1,7 @@
+{
+  "name": "vietlott-browser-worker",
+  "version": "1.0.0",
+  "dependencies": {
+    "@cloudflare/puppeteer": "^0.0.14"
+  }
+}
