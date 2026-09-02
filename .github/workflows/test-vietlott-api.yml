@@ -1,0 +1,48 @@
+name: Test Vietlott Internal API Endpoint
+on:
+  workflow_dispatch:
+
+jobs:
+  test_api:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+    - name: Test api.vietlott.vn - Max3D endpoint (biet truoc, tu repo cu)
+      run: |
+        echo "===== TEST: api.vietlott.vn (endpoint Max3D tu repo cu) ====="
+        curl -sv -o response_api.json -w "\nHTTP Status: %{http_code}\n" \
+          -H "User-Agent: Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36" \
+          -H "Accept: application/json" \
+          'https://api.vietlott.vn/services/?securitycode=vietlotcmc&jsondata={"Command":"GetMax3DResult","JsonData":"{\"PageSize\":5,\"Segment\":0,\"TopN\":0}"}' 2>&1 | tail -40
+        echo ""
+        echo "----- Noi dung response_api.json -----"
+        cat response_api.json || echo "(khong co file)"
+        echo ""
+
+    - name: Check headers of api.vietlott.vn (Cloudflare check)
+      run: |
+        echo "===== HEADER CUA api.vietlott.vn ====="
+        curl -sI 'https://api.vietlott.vn/services/' | tee headers_api.txt
+        echo ""
+        grep -i "cf-mitigated\|cf-ray\|server" headers_api.txt || echo "(khong tim thay header lien quan)"
+
+    - name: Try alternative command names for Lotto 5/35
+      run: |
+        echo "===== THU CAC COMMAND KHAC CHO LOTTO 5/35 ====="
+        for CMD in "GetPowerResult" "GetLottoResult" "Get535Result" "GetMega645Result"; do
+          echo "--- Thu Command: $CMD ---"
+          curl -s -o /dev/null -w "HTTP Status: %{http_code}\n" \
+            -H "User-Agent: Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36" \
+            "https://api.vietlott.vn/services/?securitycode=vietlotcmc&jsondata={\"Command\":\"$CMD\",\"JsonData\":\"{\\\"PageSize\\\":5,\\\"Segment\\\":0,\\\"TopN\\\":0}\"}"
+          echo ""
+        done
+
+    - name: Upload debug artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: vietlott-api-debug-output
+        path: |
+          response_api.json
+          headers_api.txt
+        if-no-files-found: ignore
