@@ -1,0 +1,51 @@
+name: Debug Vietlott Block Detection
+on:
+  workflow_dispatch:
+
+jobs:
+  debug_block:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+    - name: Test 1 - Raw curl no headers
+      run: |
+        echo "===== TEST 1: RAW CURL (KHÔNG HEADER) ====="
+        curl -sv -o /dev/null -w "HTTP Status: %{http_code}\nTotal time: %{time_total}s\n" https://www.vietlott.vn 2>&1 | tail -40
+        echo ""
+
+    - name: Test 2 - With browser UA + headers
+      run: |
+        echo "===== TEST 2: VỚI USER-AGENT TRÌNH DUYỆT ====="
+        curl -sv -o response.html -w "HTTP Status: %{http_code}\nTotal time: %{time_total}s\n" \
+          -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
+          -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8" \
+          -H "Accept-Language: vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7" \
+          https://www.vietlott.vn 2>&1 | tail -40
+        echo ""
+        echo "----- 50 dòng đầu response.html -----"
+        head -50 response.html || echo "(không có file response.html)"
+        echo ""
+
+    - name: Test 3 - Check Cloudflare / WAF signatures
+      run: |
+        echo "===== TEST 3: HEADER PHẢN HỒI (KIỂM TRA CLOUDFLARE/WAF) ====="
+        curl -sI https://www.vietlott.vn | tee headers.txt
+        echo ""
+        echo "----- Grep dấu hiệu Cloudflare -----"
+        grep -i "cf-ray\|server\|cloudflare\|x-sucuri\|x-waf" headers.txt || echo "(không tìm thấy header liên quan)"
+
+    - name: Test 4 - Check runner outbound IP
+      run: |
+        echo "===== TEST 4: IP CỦA GITHUB RUNNER ====="
+        curl -s ifconfig.me
+        echo ""
+
+    - name: Upload debug artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: vietlott-debug-output
+        path: |
+          response.html
+          headers.txt
+        if-no-files-found: ignore
