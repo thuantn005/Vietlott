@@ -1,0 +1,93 @@
+name: Test Browserless vs Vietlott Cloudflare
+on:
+  workflow_dispatch:
+
+jobs:
+  test_browserless:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install puppeteer-core
+      run: npm install puppeteer-core
+
+    - name: Test vietlott.vn via Browserless
+      env:
+        BROWSERLESS_TOKEN: ${{ secrets.BROWSERLESS_TOKEN }}
+      run: |
+        node - <<'EOF'
+        const puppeteer = require('puppeteer-core');
+
+        (async () => {
+          const token = process.env.BROWSERLESS_TOKEN;
+          if (!token) {
+            console.log("LOI: Chua cau hinh secret BROWSERLESS_TOKEN trong repo Settings > Secrets > Actions");
+            process.exit(1);
+          }
+
+          const TARGET_URL = "https://www.vietlott.vn";
+
+          console.log(`Dang ket noi toi Browserless...`);
+          let browser;
+          try {
+            browser = await puppeteer.connect({
+              browserWSEndpoint: `wss://chrome.browserless.io?token=${token}`,
+            });
+
+            const page = await browser.newPage();
+            await page.setUserAgent(
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            );
+
+            console.log(`Dang truy cap: ${TARGET_URL}`);
+            const response = await page.goto(TARGET_URL, {
+              waitUntil: "networkidle2",
+              timeout: 60000,
+            });
+
+            console.log(`HTTP Status (lan goto dau tien): ${response.status()}`);
+
+            // Doi them de Cloudflare Managed Challenge tu giai xong (neu co)
+            console.log("Dang doi Cloudflare challenge tu giai (10 giay)...");
+            await new Promise((resolve) => setTimeout(resolve, 10000));
+
+            const title = await page.title();
+            const content = await page.content();
+
+            console.log(`Tieu de trang sau khi doi: ${title}`);
+            console.log(`Do dai HTML: ${content.length} ky tu`);
+
+            const lowered = content.toLowerCase();
+            if (
+              lowered.includes("checking your browser") ||
+              lowered.includes("just a moment") ||
+              title.toLowerCase().includes("just a moment")
+            ) {
+              console.log("CANH BAO: Van con dinh Cloudflare challenge page sau 10 giay cho.");
+            } else {
+              console.log("THANH CONG: Co ve da vuot qua Cloudflare, nhan duoc noi dung trang that!");
+            }
+
+            const fs = require("fs");
+            fs.writeFileSync("browserless_response_preview.html", content.slice(0, 5000));
+
+            await browser.close();
+          } catch (err) {
+            console.log(`LOI: ${err.message}`);
+            if (browser) await browser.close();
+            process.exit(1);
+          }
+        })();
+        EOF
+
+    - name: Upload response preview
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: browserless-response-preview
+        path: browserless_response_preview.html
+        if-no-files-found: ignore
