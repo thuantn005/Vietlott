@@ -1,0 +1,84 @@
+name: Test ScraperAPI Bypass Cloudflare (Vietlott)
+on:
+  workflow_dispatch:
+
+jobs:
+  test_scraperapi:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: Install dependencies
+      run: pip install requests beautifulsoup4
+
+    - name: Test ScraperAPI against vietlott.vn
+      env:
+        SCRAPERAPI_KEY: ${{ secrets.SCRAPERAPI_KEY }}
+      run: |
+        python - <<'EOF'
+        import os
+        import requests
+        from bs4 import BeautifulSoup
+
+        API_KEY = os.environ.get("SCRAPERAPI_KEY")
+        if not API_KEY:
+            print("LOI: Chua cau hinh secret SCRAPERAPI_KEY trong repo Settings > Secrets > Actions")
+            exit(1)
+
+        TARGET_URL = "https://www.vietlott.vn"
+
+        # render=true de bat JS rendering, can thiet de vuot Cloudflare challenge
+        params = {
+            "api_key": API_KEY,
+            "url": TARGET_URL,
+            "render": "true",
+        }
+
+        print(f"Dang goi ScraperAPI toi: {TARGET_URL}")
+        try:
+            response = requests.get(
+                "https://api.scraperapi.com/",
+                params=params,
+                timeout=90,
+            )
+            print(f"HTTP Status: {response.status_code}")
+            print(f"Do dai response: {len(response.text)} ky tu")
+            print("-" * 60)
+
+            if response.status_code == 200:
+                soup = BeautifulSoup(response.text, "html.parser")
+                title = soup.title.text if soup.title else "(khong co tieu de)"
+                print(f"Tieu de trang: {title}")
+
+                # Kiem tra xem co con dinh Cloudflare challenge khong
+                lowered = response.text.lower()
+                if "checking your browser" in lowered or "cf-mitigated" in lowered or "just a moment" in lowered:
+                    print("CANH BAO: Co ve van con dinh Cloudflare challenge page, chua that su vuot qua duoc.")
+                else:
+                    print("KET QUA: Co ve da vuot qua Cloudflare, nhan duoc noi dung trang that.")
+
+                # Luu 100 dong dau de kiem tra thu cong
+                with open("scraperapi_response_preview.html", "w", encoding="utf-8") as f:
+                    f.write(response.text[:5000])
+            else:
+                print(f"That bai. Noi dung tra ve: {response.text[:1000]}")
+
+        except Exception as e:
+            print(f"LOI KET NOI: {e}")
+            exit(1)
+        EOF
+
+    - name: Upload response preview
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: scraperapi-response-preview
+        path: scraperapi_response_preview.html
+        if-no-files-found: ignore
