@@ -1,0 +1,70 @@
+name: Test Cloudflare WARP vs Vietlott
+on:
+  workflow_dispatch:
+
+jobs:
+  test_warp:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+    - name: Baseline - Test WITHOUT WARP first
+      run: |
+        echo "===== BASELINE: KHONG QUA WARP ====="
+        curl -sI -o /dev/null -w "HTTP Status: %{http_code}\n" https://www.vietlott.vn
+        echo ""
+
+    - name: Install Cloudflare WARP client
+      run: |
+        curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | sudo gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
+        echo "deb [signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/cloudflare-client.list
+        sudo apt-get update
+        sudo apt-get install -y cloudflare-warp
+
+    - name: Register and connect WARP
+      run: |
+        warp-cli --accept-tos registration new
+        sleep 2
+        # Che do proxy (khong dung WARP tunnel toan he thong, chi bat SOCKS5 local)
+        warp-cli --accept-tos mode proxy
+        warp-cli --accept-tos proxy port 40000
+        warp-cli --accept-tos connect
+        sleep 8
+        warp-cli --accept-tos status
+
+    - name: Verify WARP is working (check IP change)
+      run: |
+        echo "===== IP KHONG QUA WARP ====="
+        curl -s ifconfig.me
+        echo ""
+        echo "===== IP QUA WARP PROXY (SOCKS5 port 40000) ====="
+        curl -s --socks5-hostname 127.0.0.1:40000 ifconfig.me
+        echo ""
+
+    - name: Test vietlott.vn THROUGH WARP proxy
+      run: |
+        echo "===== TEST: VIETLOTT.VN QUA WARP ====="
+        curl -sv --socks5-hostname 127.0.0.1:40000 \
+          -o response_warp.html \
+          -w "HTTP Status: %{http_code}\nTotal time: %{time_total}s\n" \
+          -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
+          https://www.vietlott.vn 2>&1 | tail -40
+        echo ""
+        echo "----- 50 dong dau response_warp.html -----"
+        head -50 response_warp.html || echo "(khong co file)"
+
+    - name: Check headers through WARP
+      run: |
+        echo "===== HEADER QUA WARP ====="
+        curl -sI --socks5-hostname 127.0.0.1:40000 https://www.vietlott.vn | tee headers_warp.txt
+        echo ""
+        grep -i "cf-mitigated\|cf-ray\|server" headers_warp.txt || echo "(khong tim thay header lien quan)"
+
+    - name: Upload debug artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: warp-debug-output
+        path: |
+          response_warp.html
+          headers_warp.txt
+        if-no-files-found: ignore
